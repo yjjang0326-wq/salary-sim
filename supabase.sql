@@ -1,4 +1,4 @@
--- 연봉협상 시뮬레이터 — Supabase 초기 설정
+-- 연봉협상관리 — Supabase 초기 설정
 -- Supabase 대시보드 > SQL Editor 에 붙여넣고 실행하세요.
 
 create table if not exists app_state (
