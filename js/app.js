@@ -1,4 +1,4 @@
-const RAW = window.SEED; // data/seed.js 에서 불러온 초기 데이터
+const RAW = { emps:[], left:[], hist:[], ver:"초기" }; // 더는 seed 파일을 쓰지 않음 — 실제 데이터는 전부 Supabase에 있음
 let CORP = {"민컴":"민컴퍼니인터내셔널 주식회사","넥스트":"더넥스트제네레이션 주식회사","아마겟돈":"주식회사 아마겟돈 컴퍼니"};
 const GRADES = ["S","A","B","C","D"];
 const GMULT = {S:1.6,A:1.3,B:1.0,C:0.5,D:0};
@@ -73,22 +73,26 @@ function lastRaise(e){
   return own[0]||null;
 }
 
-let S;
-try { const j = localStorage.getItem(LSKEY); S = j? JSON.parse(j) : null; } catch(e){ S=null; }
+let S = window.__CLOUD_STATE || defaultState();
 if(!S || S.v!==1) S = defaultState();
 // 인사사항 데이터가 새로 들어오면 저장된 입력값(등급·인상률·예정일·메모)은 살리고 명단은 최신으로 맞춤
-if(S.dataVer!==RAW.ver){
-  const key=e=>e.co+"|"+e.name, old={}; (S.emps||[]).forEach(e=>old[key(e)]=e);
-  const keep=["grade","rate","plan","memo","inc","decNote"];
-  const fresh=RAW.emps.map(r=>{ const n=fromRaw(r), o=old[key(r)]; if(o){ keep.forEach(k=>{ if(o[k]!==undefined) n[k]=o[k]; }); n.id=o.id; } return n; });
-  const manual=(S.emps||[]).filter(e=>e.manual && !fresh.some(f=>key(f)===key(e)));
-  const leftNow=(RAW.left||[]).map(fromRaw);
-  S.emps=[...fresh,...manual]; S.left=[...leftNow, ...(S.left||[]).filter(l=>!leftNow.some(x=>key(x)===key(l)) && !S.emps.some(x=>key(x)===key(l)))];
-  S.dataVer=RAW.ver; S.mids=avgMids(S.emps);
-}
+// 예전에는 여기서 seed.js(원본 시트)가 갱신될 때마다 명단을 다시 맞추고 등급·인상률 등 입력값만
+// 살리는 병합을 했음. 이제 seed가 없고 Supabase가 유일한 원본이라 이 병합은 더 이상 쓰지 않음 —
+// 남겨뒀다면 RAW.emps가 항상 비어 있어서 실행할 때마다 전체 명단이 지워짐(실제로 겪은 버그).
 if(!S.left) S.left=[];
 let __pendingEdit=true;
-function persist(){ try{ localStorage.setItem(LSKEY, JSON.stringify(S)); }catch(e){} }
+let __saveTimer=null, __saveFailed=false;
+function persist(){
+  try{ localStorage.setItem(LSKEY, JSON.stringify(S)); }catch(e){} // 네트워크 끊겼을 때를 위한 로컬 백업
+  clearTimeout(__saveTimer);
+  __saveTimer = setTimeout(async ()=>{
+    try{
+      const { error } = await window.__sb.from("app_state").upsert({ id:1, data:S, updated_at:new Date().toISOString() });
+      if(error) throw error;
+      if(__saveFailed){ __saveFailed=false; toast("클라우드에 다시 저장되었습니다"); }
+    }catch(e){ console.error(e); if(!__saveFailed){ __saveFailed=true; toast("클라우드 저장 실패 — 인터넷 연결을 확인하세요"); } }
+  }, 600);
+}
 
 /* ---------- 계산 ---------- */
 function roundTo(x){ const u=S.set.round||1; return Math.round(x/u)*u; }
@@ -138,7 +142,7 @@ function renderHeader(){
   document.body.style.setProperty("--cc", S.coFilter? `var(--c-${S.coFilter})` : "");
   $("#coScope").innerHTML = S.coFilter? `${esc(CORP[S.coFilter]||S.coFilter)} (${esc(S.coFilter)})만 보고 있습니다 — 모든 탭의 숫자가 이 법인 기준입니다 <button data-cf="">전체 법인 보기</button>` : "";
   const n=incl().length;
-  $("#hsub").textContent = `${RAW.ver} 인사사항 기준 · 재직 ${S.emps.length}명 (퇴사 처리 ${S.left.length}명 제외) · 협상 포함 ${n}명`;
+  $("#hsub").textContent = `재직 ${S.emps.length}명 (퇴사 처리 ${S.left.length}명 제외) · 협상 포함 ${n}명`;
 }
 
 /* ---------- 대시보드 ---------- */
@@ -606,7 +610,7 @@ $("#gGuide").addEventListener("change",ev=>{ const g=ev.target.dataset.gg; if(!g
 const PALETTE=["#2457d6","#16794c","#8b3fd1","#c2410c","#0e7490","#be185d","#4d7c0f","#a16207"];
 function ensureEdit(){
   if(!S.corpInfo){ const def={"민컴":"#2457d6","넥스트":"#16794c","아마겟돈":"#8b3fd1"}; S.corpInfo=Object.keys(CORP).map(k=>({code:k, full:CORP[k], color:def[k]||PALETTE[3]})); }
-  if(!S.hist || (!S.histEdited && S.histVer!==RAW.ver)){ S.hist=RAW.hist.map(h=>({...h, id:uid()})); S.histVer=RAW.ver; }
+  if(!S.hist){ S.hist=RAW.hist.map(h=>({...h, id:uid()})); S.histVer=RAW.ver; }
   S.hist.forEach(h=>{ if(!h.id) h.id=uid(); });
   applyCorps();
 }
@@ -660,7 +664,6 @@ $("#histTbl").addEventListener("change",ev=>{ const t=ev.target, tr=t.closest("t
   recalcHist(h); S.histEdited=true; renderAll(); });
 $("#histTbl").addEventListener("click",ev=>{ const id=ev.target.dataset.hdel; if(!id) return; const i=S.hist.findIndex(x=>x.id===id); const h=S.hist.splice(i,1)[0]; S.histEdited=true; renderAll(); toast(`${h.name} ${h.date} 이력을 삭제했습니다`,()=>{ S.hist.splice(i,0,h); renderAll(); }); });
 $("#histAdd").onclick=()=>{ S.hist.forEach(x=>delete x._new); const h={id:uid(), co:allCorps()[0]||"", name:"", hire:"", date:ymd(TODAY), before:0, after:0, note:"", manual:true, _new:true}; recalcHist(h); S.hist.unshift(h); S.histEdited=true; $("#hQ").value=""; $("#hCo").value="all"; $("#hY").value="all"; renderAll(); $("#histTbl [data-hf=name]").focus(); };
-$("#histReset").onclick=()=>{ const prev=S.hist; S.hist=RAW.hist.map(h=>({...h,id:uid()})); S.histEdited=false; S.histVer=RAW.ver; renderAll(); toast("인상 이력을 원본 시트 값으로 되돌렸습니다",()=>{ S.hist=prev; S.histEdited=true; renderAll(); }); };
 
 /* ---------- 설정 ---------- */
 const SETDEF=[
@@ -762,6 +765,7 @@ $("#bExport").onclick=()=>{
   download(`연봉협상_시뮬레이션_${ymd(TODAY)}.csv`, "﻿"+lines.join("\r\n"), "text/csv;charset=utf-8");
 };
 $("#bSave").onclick=()=>download(`연봉협상_시나리오_${ymd(TODAY)}.json`, JSON.stringify(S,null,1), "application/json");
+$("#bLogout").onclick=async ()=>{ clearTimeout(__saveTimer); await window.__sb.auth.signOut(); location.reload(); };
 $("#fLoad").onchange=ev=>{ const f=ev.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const j=JSON.parse(rd.result); if(!j.emps||!j.set) throw 0; const prev=S; S=j; renderAll(); toast("시나리오를 불러왔습니다",()=>{S=prev;renderAll();}); }catch(e){ toast("시나리오 파일을 읽지 못했습니다"); } }; rd.readAsText(f); ev.target.value=""; };
 
 /* ---------- 탭 / 토스트 ---------- */

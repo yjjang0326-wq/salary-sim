@@ -5,19 +5,22 @@
 
 ## 파일 구조
 ```
-index.html        화면 마크업(탭·카드·표 틀)
+index.html        화면 마크업(탭·카드·표 틀) + 로그인 모달
 css/style.css     스타일 (색 토큰은 :root, 다크모드 포함)
+js/boot.js        Supabase 클라이언트·로그인·데이터 로드. 끝나면 js/app.js를 동적으로 붙임
 js/app.js         모든 로직 (아래 섹션 순서)
-data/seed.js      초기 데이터 window.SEED = { ver, emps, left, hist }
+supabase.sql      Supabase 테이블·RLS 정의 (최초 1회 SQL Editor에서 실행)
 ```
-`index.html`이 `data/seed.js` → `js/app.js` 순서로 불러옵니다. `file://`로 열려야 하므로 fetch/모듈(import) 대신 일반 `<script>`를 씁니다.
+`index.html`은 Supabase JS CDN → `js/boot.js`만 정적으로 불러옵니다. `boot.js`가 로그인·데이터 로드를 끝낸 뒤 `<script src="js/app.js">`를 `document.body`에 직접 추가해서 실행합니다 — `app.js`의 최상단 코드가 동기적으로 `window.__CLOUD_STATE`를 읽으므로, 반드시 이 순서(로그인 확인 → 데이터 fetch 완료 → app.js 삽입)를 지켜야 합니다. `file://`로도 열려야 하므로 fetch/모듈(import) 대신 일반 `<script>`를 씁니다. 더는 `data/seed.js`를 쓰지 않습니다(실명·연봉이 든 로컬 파일을 아예 없앰).
 
 ## 데이터 흐름
-- **초기값**: `data/seed.js` (`SEED.emps` 재직자, `SEED.left` 퇴사자, `SEED.hist` 인상 이력, `SEED.ver` 데이터 버전)
-- **작업 상태**: 전역 `S` 객체. 모든 입력값은 `persist()`로 `localStorage['salarySim.v1']`에 저장
-- `SEED.ver`가 바뀌면 저장된 등급·인상률·예정일·메모는 살리고 명단만 seed 기준으로 다시 맞춤 (`app.js`의 `S.dataVer!==RAW.ver` 블록)
-- 이제 시트 연동 없이 **프로그램 안에서 직접 입력**하는 것이 기본. seed는 「처음 상태로 되돌리기」 기준값
-- 「시나리오 저장/불러오기」로 `S` 전체를 JSON 파일로 백업·복원
+- **원본 저장소**: Supabase 테이블 `app_state` (id=1 고정 한 줄, `data` 컬럼에 `S` 객체 전체를 JSONB로 통째 저장). RLS는 로그인한 사용자만 통과, 비로그인 접근은 정책 자체가 없어 막힘
+- **로그인**: 이메일+비밀번호(`signInWithPassword`). 가입은 Supabase 쪽에서 막아두고 Authentication > Users에서 관리자가 직접 계정을 만드는 전제
+- **작업 상태**: 전역 `S` 객체(기존과 동일). `persist()`가 (1) `localStorage['salarySim.v1']`에 즉시 백업 저장, (2) 600ms 디바운스 후 `app_state` 행을 `upsert` — 이 두 단계를 모두 함
+- 최초 로그인 시 `app_state`에 행이 없고 이 브라우저에 예전 localStorage 데이터가 남아 있으면, 그 값으로 한 번 부트스트랩해서 그대로 Supabase에 올림(마이그레이션). 그 다음부터는 Supabase가 기준
+- `RAW`(`js/app.js` 1번째 줄)는 이제 빈 스키마 기본값(`{emps:[],left:[],hist:[],ver:"초기"}`)일 뿐, 실제 데이터가 아님 — `S.dataVer!==RAW.ver` 병합 블록은 사실상 더 이상 발동하지 않음(안전하게 죽은 코드로 남겨둠)
+- 「시나리오 저장/불러오기」로 `S` 전체를 JSON 파일로 백업·복원 (기존과 동일, Supabase와 무관하게 동작)
+- 「설정·데이터」 탭의 "전체 데이터 초기화"는 `defaultState()`(완전히 빈 상태)로 되돌리고 다음 저장 때 Supabase에도 반영됨 — 되돌릴 수 없는 동작
 
 ### S 주요 키
 | 키 | 내용 |
@@ -52,4 +55,4 @@ data/seed.js      초기 데이터 window.SEED = { ver, emps, left, hist }
 - 렌더 함수는 상태 `S`에서 다시 그리는 방식. 값을 바꾼 뒤 `renderAll()` 호출 (내부에서 `persist()`)
 - 삭제 동작은 `toast(메시지, 되돌리기함수)`로 되돌리기 제공
 - 법인 색은 CSS 변수 `--c-<약칭>` (applyCorps가 주입), 표의 법인 줄은 `coRow(co)`, 배지는 `coTag(co)`
-- `data/seed.js`에는 실명·연봉이 들어 있으니 외부 공개 저장소에 올리지 말 것
+- 이 저장소는 공개해도 됨 — 실명·연봉은 Supabase에만 있고 코드에는 없음. `js/boot.js`의 Supabase anon 키는 공개돼도 안전한 키(RLS가 비로그인 접근을 막음)
