@@ -726,6 +726,7 @@ function openPerson(id, edit){
       <label>부서 <input type="text" id="peDept" class="w120" value="${esc(e.dept)}"></label>
       <label>직위 <input type="text" id="pePos" class="w90" value="${esc(e.pos)}"></label>
       <label>입사일 <input type="date" id="peHire" value="${e.hire}"></label>
+      <label>퇴사일 <input type="date" id="peLeftD" value=""></label>
       <label>식대 <input type="number" id="peMeal" class="w90" value="${e.meal}"></label>
       <label>연봉(만원) <input type="number" id="peAnn" class="w90" value="${e.ann/1e4}"></label>
       <label>고용형태 <select id="peType">${["정규직","계약직"].map(x=>`<option ${x===e.type?"selected":""}>${x}</option>`).join("")}</select></label>
@@ -733,14 +734,23 @@ function openPerson(id, edit){
       <label>지원금 <input type="text" id="peFund" class="w140" value="${esc(fundOf(e))}"></label>
       <button class="btn sm pri" id="peSave">저장</button>
     </div>
-    <div class="toolbar" style="margin-bottom:14px"><b>퇴사 처리</b><label>퇴사일 <input type="date" id="peLeft" value="${ymd(TODAY)}"></label><button class="btn sm" id="peLeftBtn">퇴사자로 옮기기</button><div class="spacer"></div><button class="btn sm" id="peDel" style="color:var(--bad)">명단에서 삭제</button><span class="muted" style="font-size:13px">옮기면 모든 합계·인건비·협상 대상에서 빠집니다. 설정·데이터 탭에서 되돌릴 수 있습니다.</span></div>
+    <div class="toolbar" style="margin-bottom:14px"><button class="btn sm" id="peDel" style="color:var(--bad)">명단에서 삭제</button><span class="muted" style="font-size:13px">퇴사일을 입력하고 저장하면 퇴사자 명단으로 자동으로 옮겨집니다. 설정·데이터 탭에서 되돌릴 수 있습니다.</span></div>
     <h2 style="font-size:14px;margin:8px 0">인상 이력</h2>
     <div class="tw"><table><thead><tr><th class="l">변경일자</th><th class="l">법인</th><th>기존</th><th>변경후</th><th>인상률</th><th class="l">비고</th></tr></thead><tbody>${H.length? H.map(h=>`<tr><td class="l">${h.date}</td><td class="l">${esc(h.co)}</td><td>${won(h.before)}</td><td>${h.pending?'<span class="tag acc">예정</span>':won(h.after)}</td><td>${h.pending?"-":pct(h.rate)}</td><td class="l" style="white-space:normal;font-size:12px">${esc(h.note)}</td></tr>`).join("") : `<tr><td colspan="6" class="c muted">연봉협상원본에 기록이 없습니다</td></tr>`}</tbody></table></div>
     <h2 style="font-size:14px;margin:16px 0 8px">연봉 조정 통보서 미리보기</h2>
     <div id="letterWrap">${letter(e,r)}</div>`;
   $("#modal").classList.add("on");
-  $("#peSave").onclick=()=>{ e.ann=Math.round((+$("#peAnn").value||0)*1e4)||e.ann; e.type=$("#peType").value; e.exec=$("#peExec").checked; e.fund=$("#peFund").value; e.co=$("#peCo").value; e.name=$("#peName").value.trim()||e.name; e.dept=$("#peDept").value; e.pos=$("#pePos").value; e.hire=$("#peHire").value; e.meal=+$("#peMeal").value||0; renderAll(); openPerson(e.id); };
-  $("#peLeftBtn").onclick=()=>{ const i=S.emps.indexOf(e); S.emps.splice(i,1); e.left=$("#peLeft").value||ymd(TODAY); S.left.push(e); $("#modal").classList.remove("on"); renderAll(); toast(`${e.name}을(를) 퇴사자로 옮겼습니다`,()=>{ S.left.splice(S.left.indexOf(e),1); delete e.left; S.emps.splice(i,0,e); renderAll(); }); };
+  $("#peSave").onclick=()=>{
+    e.ann=Math.round((+$("#peAnn").value||0)*1e4)||e.ann; e.type=$("#peType").value; e.exec=$("#peExec").checked; e.fund=$("#peFund").value; e.co=$("#peCo").value; e.name=$("#peName").value.trim()||e.name; e.dept=$("#peDept").value; e.pos=$("#pePos").value; e.hire=$("#peHire").value; e.meal=+$("#peMeal").value||0;
+    if(!HIST().some(h=>h.name===e.name)){ const d=defaultPlan(e,S.set.cycle); if(d) e.plan=ymd(d); } // 인상 이력이 없는 신규 등록만 입사일 기준으로 예정일 자동 계산
+    const leftD=$("#peLeftD").value;
+    if(leftD){
+      const i=S.emps.indexOf(e); if(i>-1) S.emps.splice(i,1);
+      e.left=leftD; S.left.push(e);
+      $("#modal").classList.remove("on"); renderAll();
+      toast(`${e.name}을(를) 퇴사자로 옮겼습니다`,()=>{ const li=S.left.indexOf(e); if(li>-1) S.left.splice(li,1); delete e.left; S.emps.push(e); renderAll(); });
+    } else { renderAll(); openPerson(e.id); }
+  };
   $("#peDel").onclick=()=>{ const i=S.emps.indexOf(e); S.emps.splice(i,1); $("#modal").classList.remove("on"); renderAll(); toast(`${e.name}을(를) 삭제했습니다`,()=>{ S.emps.splice(i,0,e); renderAll(); }); };
   $("#mReport").onclick=()=>goReport(e.id);
   if(edit) $("#peName").select();
