@@ -5,6 +5,11 @@ const SUPABASE_ANON_KEY = "sb_publishable_8CRjqDfgaFvbQIj_b1wwcA_CG5maquN";
 
 window.__sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// 캐시 무효화: index.html이 이 파일을 "js/boot.js?v=N"으로 불러오면, 같은 버전을
+// js/app.js에도 붙여서 둘 다 새로 받아오게 함. N은 index.html에서만 올리면 됨
+// (버튼을 눌러도 반응이 없는 문제는 대부분 이 캐시 때문 — 실제로 한 번 겪었음).
+const BUILD_V = (document.currentScript && document.currentScript.src.split("?v=")[1]) || Date.now();
+
 const BOOT_LSKEY = "salarySim.v1"; // js/app.js의 LSKEY와 같은 값(마이그레이션용). 이름을 다르게 둔 건 app.js를 나중에 같은 전역 스코프에 끼워넣기 때문 — 겹치면 SyntaxError로 app.js 전체가 죽음
 const $g = id => document.getElementById(id);
 
@@ -38,7 +43,7 @@ async function loadAndLaunch(){
   }
   window.__CLOUD_STATE = cloud;
   const s = document.createElement("script");
-  s.src = "js/app.js";
+  s.src = "js/app.js?v=" + BUILD_V;
   document.body.appendChild(s);
 }
 

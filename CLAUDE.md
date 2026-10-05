@@ -14,6 +14,8 @@ supabase/functions/create-admin/index.ts   관리자 추가용 Edge Function (Su
 ```
 `index.html`은 Supabase JS CDN → `js/boot.js`만 정적으로 불러옵니다. `boot.js`가 로그인·데이터 로드를 끝낸 뒤 `<script src="js/app.js">`를 `document.body`에 직접 추가해서 실행합니다 — `app.js`의 최상단 코드가 동기적으로 `window.__CLOUD_STATE`를 읽으므로, 반드시 이 순서(로그인 확인 → 데이터 fetch 완료 → app.js 삽입)를 지켜야 합니다. `file://`로도 열려야 하므로 fetch/모듈(import) 대신 일반 `<script>`를 씁니다. 더는 `data/seed.js`를 쓰지 않습니다(실명·연봉이 든 로컬 파일을 아예 없앰).
 
+**캐시 무효화**: `index.html`의 `<script src="js/boot.js?v=N">`에 버전 쿼리가 붙어 있고, `boot.js`가 그 값을 읽어 `js/app.js?v=N`에도 그대로 붙여 줌. GitHub Pages는 커스텀 캐시 헤더를 못 바꾸는데 정적 자산을 꽤 길게 캐싱해서, 버전 쿼리 없이는 index.html만 새로 받고 js/app.js는 브라우저에 남은 예전 버전을 계속 쓰는 문제가 실제로 있었음(버튼을 눌러도 반응이 없었음 — 새 HTML + 예전 JS 조합이라 핸들러가 아예 안 걸려 있었던 것). **js/app.js나 js/boot.js를 고칠 때마다 index.html의 `?v=N` 숫자를 하나 올릴 것** — 이거 하나로 두 파일 다 새로 받아감.
+
 ## 데이터 흐름
 - **원본 저장소**: Supabase 테이블 `app_state` (id=1 고정 한 줄, `data` 컬럼에 `S` 객체 전체를 JSONB로 통째 저장). RLS는 로그인한 사용자만 통과, 비로그인 접근은 정책 자체가 없어 막힘
 - **로그인**: 이메일+비밀번호(`signInWithPassword`). 가입은 Supabase 쪽에서 막아두고 Authentication > Users에서 관리자가 직접 계정을 만드는 전제
