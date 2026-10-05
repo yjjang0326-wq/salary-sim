@@ -1,7 +1,7 @@
 // Supabase 연결·로그인·데이터 로드. 이 파일이 끝나야 js/app.js를 붙여서 실행함.
 // 아래 두 값을 Supabase 프로젝트 설정(Settings > API)의 실제 값으로 바꾸세요.
-const SUPABASE_URL = "https://YOUR-PROJECT.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR-ANON-KEY";
+const SUPABASE_URL = "https://jxikjsdaswejifcpjesn.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_8CRjqDfgaFvbQIj_b1wwcA_CG5maquN";
 
 window.__sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
