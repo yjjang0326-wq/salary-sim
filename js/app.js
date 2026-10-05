@@ -148,23 +148,9 @@ function renderHeader(){
 /* ---------- 대시보드 ---------- */
 function renderDash(){
   const L=incl(), R=L.map(e=>({e,r:calc(e)}));
-  const a0=sum(L,e=>e.ann), a1=sum(R,x=>x.r.newAnn), c0=sum(R,x=>x.r.cost0), c1=sum(R,x=>x.r.cost1), yc=sum(R,x=>x.r.yearCost);
-  const rates=R.map(x=>x.r.eff);
-  $("#dashKpi").innerHTML = [
-    ["협상 포함 인원", L.length+"명", `전체 등록 ${S.emps.length}명`],
-    ["연봉 총액 (현재)", man(a0)+"원", wm(a0)+"만원"],
-    ["연봉 총액 (협상 후)", man(a1)+"원", `+${wm(a1-a0)}만원`],
-    ["평균 인상률", pct(a0? (a1-a0)/a0*100 : 0), `단순평균 ${pct(sum(rates)/(rates.length||1))} · 중앙값 ${pct(median(rates))}`],
-    ["회사 부담 인건비 증가", man(c1-c0)+"원", `4대보험·퇴직급여 포함 연간`],
-    [`${S.set.year}년 반영분`, man(yc)+"원", `적용월부터 ${S.set.year}년 말까지`]
-  ].map(k=>`<div class="kpi"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="s">${k[2]}</div></div>`).join("");
+  const cs=corps();
 
-  const cs=corps(); const max=Math.max(1,...cs.map(c=>sum(R.filter(x=>x.e.co===c),x=>x.r.newAnn)));
-  $("#dashBars").innerHTML = cs.map(c=>{ const rr=R.filter(x=>x.e.co===c); const x0=sum(rr,x=>x.e.ann), x1=sum(rr,x=>x.r.newAnn);
-    return `<div class="cb"><div class="t"><span>${coTag(c)} <span class="muted">${rr.length}명</span></span><span>${man(x0)} → <b>${man(x1)}</b> <span class="up">(${pct(x0?(x1-x0)/x0*100:0)})</span></span></div>
-    <div class="b"><i class="a" style="width:${x0/max*100}%"></i><i class="n" style="width:${x1/max*100}%"></i></div></div>`; }).join("");
-
-  // 경고
+  // 경고 (대시보드에는 더 안 보이지만, 보고서 탭의 "확인이 필요한 사항"이 이 계산을 그대로 씀)
   const al=[];
   R.filter(x=>!x.r.minOk && !x.e.exec).forEach(x=>al.push(["bad",`${x.e.name}(${x.e.co}) 협상 후 월 급여 ${won(x.r.nm)}원이 최저임금 월 환산액 ${won(x.r.minM)}원보다 낮습니다.`]));
   S.emps.filter(e=>{ if(e.exec) return false; const m=monthlyOf(e.ann); return m < S.set.minHour*S.set.minHours; }).forEach(e=>al.push(["warn",`${e.name}(${e.co}) 현재 월 급여 ${won(monthlyOf(e.ann))}원이 설정된 최저임금(${won(S.set.minHour)}원/시간) 기준에 못 미칩니다. 적용 시점 전에 조정이 필요합니다.`]));
@@ -684,15 +670,6 @@ function renderSet(){
 $("#setTbl").addEventListener("change",ev=>{ const k=ev.target.dataset.sk; if(!k) return; const v=ev.target.value; S.set[k]= v==="true"?true: v==="false"?false: +v;
   if(k==="cycle"){ /* 주기 변경 시 예정일 재계산 여부 */ const prev=S.emps.map(e=>e.plan); S.emps.forEach(e=>{ const d=defaultPlan(e,S.set.cycle); if(d) e.plan=ymd(d); }); toast("협상 주기에 맞춰 예정일을 다시 계산했습니다",()=>{ S.emps.forEach((e,i)=>e.plan=prev[i]); renderAll(); }); }
   renderAll(); });
-function parsePaste(txt){
-  const out=[]; txt.split(/\r?\n/).forEach(line=>{ if(!line.trim()) return; let c=line.split("\t"); if(c.length<6) c=line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
-    c=c.map(x=>x.replace(/^"|"$/g,"").trim()); if(c.length<6) return; const ann=+c[5].replace(/[^\d.]/g,""); if(!ann) return;
-    const e={id:uid(),manual:true,co:c[0],name:c[1],dept:c[2],pos:c[3],type:"정규직",hire:ymd(pd(c[4])),ann:Math.round(ann/1e4)*1e4,meal:S.set.mealExempt,inc:true,grade:"B",rate:null,plan:"",memo:""};
-    e.plan=ymd(defaultPlan(e,S.set.cycle)); out.push(e); });
-  return out;
-}
-$("#pasteAdd").onclick=()=>{ const a=parsePaste($("#pasteBox").value); S.emps.push(...a); $("#pasteMsg").textContent=`${a.length}명 추가`; renderAll(); };
-$("#pasteReplace").onclick=()=>{ const a=parsePaste($("#pasteBox").value); if(!a.length){ $("#pasteMsg").textContent="읽을 수 있는 행이 없습니다"; return; } const prev=S.emps; S.emps=a; $("#pasteMsg").textContent=`${a.length}명으로 교체`; renderAll(); toast("명단을 교체했습니다",()=>{ S.emps=prev; renderAll(); }); };
 $("#resetAll").onclick=()=>{ const prev=JSON.stringify(S); try{localStorage.removeItem(LSKEY);}catch(e){} S=defaultState(); renderAll(); toast("처음 상태로 되돌렸습니다",()=>{ S=JSON.parse(prev); renderAll(); }); };
 $("#adminAdd").onclick=async()=>{
   const email=$("#adminEmail").value.trim(), pw=$("#adminPw").value;
@@ -786,9 +763,7 @@ $("#bExport").onclick=()=>{
     lines.push([i+1,e.co,e.name, h? `${h.getFullYear()}. ${String(h.getMonth()+1).padStart(2,"0")}. ${String(h.getDate()).padStart(2,"0")}`:"", won(monthlyOf(e.ann)), won(e.ann), e.plan, d?`${d.getMonth()+1}월 귀속부터 반영`:"", won(r.nm), won(r.newAnn), won(r.inc), r.eff.toFixed(1), e.grade, e.memo||""].map(q).join(",")); });
   download(`연봉협상_시뮬레이션_${ymd(TODAY)}.csv`, "﻿"+lines.join("\r\n"), "text/csv;charset=utf-8");
 };
-$("#bSave").onclick=()=>download(`연봉협상_시나리오_${ymd(TODAY)}.json`, JSON.stringify(S,null,1), "application/json");
 $("#bLogout").onclick=async ()=>{ clearTimeout(__saveTimer); await window.__sb.auth.signOut(); location.reload(); };
-$("#fLoad").onchange=ev=>{ const f=ev.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{ const j=JSON.parse(rd.result); if(!j.emps||!j.set) throw 0; const prev=S; S=j; renderAll(); toast("시나리오를 불러왔습니다",()=>{S=prev;renderAll();}); }catch(e){ toast("시나리오 파일을 읽지 못했습니다"); } }; rd.readAsText(f); ev.target.value=""; };
 
 /* ---------- 탭 / 토스트 ---------- */
 function showTab(t){ document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.t===t || (t==="report" && b.dataset.t==="plan"))); document.querySelectorAll("section.tab").forEach(s=>s.classList.toggle("on",s.id==="t-"+t)); if(t!=="report") try{sessionStorage.setItem("salaryTab",t);}catch(e){} }

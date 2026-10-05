@@ -20,7 +20,6 @@ supabase/functions/create-admin/index.ts   관리자 추가용 Edge Function (Su
 - **작업 상태**: 전역 `S` 객체(기존과 동일). `persist()`가 (1) `localStorage['salarySim.v1']`에 즉시 백업 저장, (2) 600ms 디바운스 후 `app_state` 행을 `upsert` — 이 두 단계를 모두 함
 - 최초 로그인 시 `app_state`에 행이 없고 이 브라우저에 예전 localStorage 데이터가 남아 있으면, 그 값으로 한 번 부트스트랩해서 그대로 Supabase에 올림(마이그레이션). 그 다음부터는 Supabase가 기준
 - `RAW`(`js/app.js` 1번째 줄)는 이제 빈 스키마 기본값(`{emps:[],left:[],hist:[],ver:"초기"}`)일 뿐, 실제 데이터가 아님 — `S.dataVer!==RAW.ver` 병합 블록은 사실상 더 이상 발동하지 않음(안전하게 죽은 코드로 남겨둠)
-- 「시나리오 저장/불러오기」로 `S` 전체를 JSON 파일로 백업·복원 (기존과 동일, Supabase와 무관하게 동작)
 - 「설정·데이터」 탭의 "전체 데이터 초기화"는 `defaultState()`(완전히 빈 상태)로 되돌리고 다음 저장 때 Supabase에도 반영됨 — 되돌릴 수 없는 동작
 - 같은 탭의 "관리자 계정"에서 로그인한 사람이 새 관리자(이메일+비밀번호)를 추가할 수 있음. `supabase.functions.invoke("create-admin", ...)` → Edge Function이 `service_role` 키로 `auth.admin.createUser()` 호출. **주의**: Supabase 대시보드의 "Verify JWT" 토글은 anon key만 보내도 통과하는 느슨한 체크라서, 함수 코드 안에서 `getUser()`로 실제 로그인 여부를 한 번 더 확인함(`supabase/functions/create-admin/index.ts` 참고) — 이 체크를 빼면 공개 저장소의 anon key를 아는 아무나 관리자를 만들 수 있게 되는 실제 보안 구멍이었음(개발 중 발견·수정)
 
