@@ -214,6 +214,15 @@
       <textarea id="pasteBox" placeholder="민컴	홍길동	경영지원팀	매니저	2025.03.04	36,000,000"></textarea>
       <div class="row" style="margin-top:8px"><button class="btn" id="pasteAdd">명단에 추가</button><button class="btn" id="pasteReplace">명단 전체 교체</button><span class="muted" id="pasteMsg"></span></div>
       <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
+      <h2>관리자 계정</h2>
+      <p class="desc">이 프로그램에 로그인할 수 있는 사람을 추가합니다. 이메일·비밀번호를 정해서 추가한 뒤, 그 비밀번호를 본인에게 따로 알려주세요(문자·메신저 등).</p>
+      <div class="row">
+        <input type="email" id="adminEmail" placeholder="이메일" style="width:220px">
+        <input type="password" id="adminPw" placeholder="비밀번호 (6자 이상)" style="width:180px">
+        <button class="btn pri" id="adminAdd">관리자 추가</button>
+        <span class="muted" id="adminMsg"></span>
+      </div>
+      <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
       <h2>법인 관리</h2>
       <p class="desc">약칭을 바꾸면 직원·이력·매출 등 모든 데이터의 법인 이름이 같이 바뀝니다. 직원이나 이력이 있는 법인은 삭제할 수 없습니다.</p>
       <div class="tw" style="margin-bottom:8px"><table id="corpInfoTbl"></table></div>

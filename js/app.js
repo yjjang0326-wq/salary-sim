@@ -694,6 +694,18 @@ function parsePaste(txt){
 $("#pasteAdd").onclick=()=>{ const a=parsePaste($("#pasteBox").value); S.emps.push(...a); $("#pasteMsg").textContent=`${a.length}명 추가`; renderAll(); };
 $("#pasteReplace").onclick=()=>{ const a=parsePaste($("#pasteBox").value); if(!a.length){ $("#pasteMsg").textContent="읽을 수 있는 행이 없습니다"; return; } const prev=S.emps; S.emps=a; $("#pasteMsg").textContent=`${a.length}명으로 교체`; renderAll(); toast("명단을 교체했습니다",()=>{ S.emps=prev; renderAll(); }); };
 $("#resetAll").onclick=()=>{ const prev=JSON.stringify(S); try{localStorage.removeItem(LSKEY);}catch(e){} S=defaultState(); renderAll(); toast("처음 상태로 되돌렸습니다",()=>{ S=JSON.parse(prev); renderAll(); }); };
+$("#adminAdd").onclick=async()=>{
+  const email=$("#adminEmail").value.trim(), pw=$("#adminPw").value;
+  if(!email||pw.length<6){ $("#adminMsg").textContent="이메일과 6자 이상 비밀번호를 입력하세요"; return; }
+  $("#adminAdd").disabled=true; $("#adminMsg").textContent="추가하는 중...";
+  try{
+    const { data, error } = await window.__sb.functions.invoke("create-admin",{ body:{ email, password:pw } });
+    if(error) throw error;
+    if(data && data.error) throw new Error(data.error);
+    $("#adminMsg").textContent=`${email} 추가 완료`; $("#adminEmail").value=""; $("#adminPw").value="";
+  }catch(e){ $("#adminMsg").textContent="실패: "+e.message; }
+  $("#adminAdd").disabled=false;
+};
 
 /* ---------- 개인 상세 / 통보서 ---------- */
 function openPerson(id, edit){

@@ -10,6 +10,7 @@ css/style.css     스타일 (색 토큰은 :root, 다크모드 포함)
 js/boot.js        Supabase 클라이언트·로그인·데이터 로드. 끝나면 js/app.js를 동적으로 붙임
 js/app.js         모든 로직 (아래 섹션 순서)
 supabase.sql      Supabase 테이블·RLS 정의 (최초 1회 SQL Editor에서 실행)
+supabase/functions/create-admin/index.ts   관리자 추가용 Edge Function (Supabase에 별도 배포 필요)
 ```
 `index.html`은 Supabase JS CDN → `js/boot.js`만 정적으로 불러옵니다. `boot.js`가 로그인·데이터 로드를 끝낸 뒤 `<script src="js/app.js">`를 `document.body`에 직접 추가해서 실행합니다 — `app.js`의 최상단 코드가 동기적으로 `window.__CLOUD_STATE`를 읽으므로, 반드시 이 순서(로그인 확인 → 데이터 fetch 완료 → app.js 삽입)를 지켜야 합니다. `file://`로도 열려야 하므로 fetch/모듈(import) 대신 일반 `<script>`를 씁니다. 더는 `data/seed.js`를 쓰지 않습니다(실명·연봉이 든 로컬 파일을 아예 없앰).
 
@@ -21,6 +22,7 @@ supabase.sql      Supabase 테이블·RLS 정의 (최초 1회 SQL Editor에서 �
 - `RAW`(`js/app.js` 1번째 줄)는 이제 빈 스키마 기본값(`{emps:[],left:[],hist:[],ver:"초기"}`)일 뿐, 실제 데이터가 아님 — `S.dataVer!==RAW.ver` 병합 블록은 사실상 더 이상 발동하지 않음(안전하게 죽은 코드로 남겨둠)
 - 「시나리오 저장/불러오기」로 `S` 전체를 JSON 파일로 백업·복원 (기존과 동일, Supabase와 무관하게 동작)
 - 「설정·데이터」 탭의 "전체 데이터 초기화"는 `defaultState()`(완전히 빈 상태)로 되돌리고 다음 저장 때 Supabase에도 반영됨 — 되돌릴 수 없는 동작
+- 같은 탭의 "관리자 계정"에서 로그인한 사람이 새 관리자(이메일+비밀번호)를 추가할 수 있음. `supabase.functions.invoke("create-admin", ...)` → Edge Function이 `service_role` 키로 `auth.admin.createUser()` 호출. **주의**: Supabase 대시보드의 "Verify JWT" 토글은 anon key만 보내도 통과하는 느슨한 체크라서, 함수 코드 안에서 `getUser()`로 실제 로그인 여부를 한 번 더 확인함(`supabase/functions/create-admin/index.ts` 참고) — 이 체크를 빼면 공개 저장소의 anon key를 아는 아무나 관리자를 만들 수 있게 되는 실제 보안 구멍이었음(개발 중 발견·수정)
 
 ### S 주요 키
 | 키 | 내용 |
