@@ -26,7 +26,7 @@ supabase/functions/create-admin/index.ts   관리자 추가용 Edge Function (Su
 ### S 주요 키
 | 키 | 내용 |
 |---|---|
-| `emps[]` | 재직자: co, name, dept, pos, type, hire, ann(연봉, 원), meal, exec, fund, inc(협상 포함), grade, rate(최종 인상률, null=권장값), plan(적용일), memo, decNote |
+| `emps[]` | 재직자: co, name, dept, pos, **job(직무)**, type, hire, ann(연봉, 원), meal, exec, fund, inc(협상 포함), grade, rate(최종 인상률, null=권장값), plan(적용일), memo, decNote |
 | `left[]` | 퇴사자 (left=퇴사일). 인건비 계산에서 제외, 퇴사일 이전 달은 일할 반영 |
 | `hist[]` | 인상 이력: co, name, hire, date, before, after(0=예정), amt, rate, note |
 | `corpInfo[]` | 법인: code(약칭), full(정식명), color |
@@ -57,4 +57,5 @@ supabase/functions/create-admin/index.ts   관리자 추가용 Edge Function (Su
 - 삭제 동작은 `toast(메시지, 되돌리기함수)`로 되돌리기 제공
 - 법인 색은 CSS 변수 `--c-<약칭>` (applyCorps가 주입), 표의 법인 줄은 `coRow(co)`, 배지는 `coTag(co)`
 - 이 저장소는 공개해도 됨 — 실명·연봉은 Supabase에만 있고 코드에는 없음. `js/boot.js`의 Supabase anon 키는 공개돼도 안전한 키(RLS가 비로그인 접근을 막음)
-- 직원 등록·수정은 `openPerson()` 상세 폼 하나로 통합(「개인별 협상표」에서 이름 클릭 또는 "직원 추가"). 법인·이름·부서·직위·입사일·**퇴사일**·연봉을 한 화면에서 입력하며, 퇴사일을 채우고 저장하면 `peSave` 핸들러가 바로 `S.left`로 옮김. 인상 이력이 없는 신규 등록자는 저장 시 `defaultPlan()`으로 예정일을 자동 계산(기존 직원은 예정일을 건드리지 않음)
+- 직원 등록·수정은 `openPerson()` 상세 폼 하나로 통합(「개인별 협상표」에서 이름 클릭 또는 "직원 추가"). 법인·이름·부서·직위·직무·입사일·**퇴사일**·연봉을 한 화면에서 입력하며, 퇴사일을 채우고 저장하면 `peSave` 핸들러가 바로 `S.left`로 옮김. 인상 이력이 없는 신규 등록자는 저장 시 `defaultPlan()`으로 예정일을 자동 계산(기존 직원은 예정일을 건드리지 않음)
+- 「설정·데이터」 탭 맨 위 "인원 일괄 등록"은 CSV로 여러 명을 한 번에 등록. `parseBulkCSV()`가 **법인·이름·팀·직급·직무·입사일·퇴사일·연봉**(8열, 머리글 줄 자동 스킵) 순서로 파싱 → 퇴사일이 있으면 `S.left`, 없으면 `S.emps`(+ `defaultPlan()`으로 예정일 계산)로 분류. "명단에 추가"는 기존에 더하고 "명단 전체 교체"는 `S.emps`/`S.left`를 통째로 갈아끼움(둘 다 토스트로 되돌리기 제공). "양식 내려받기"가 만드는 CSV는 `download()` 재사용, UTF-8 BOM 포함(엑셀 한글 깨짐 방지)

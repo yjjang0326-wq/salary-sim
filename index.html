@@ -196,6 +196,20 @@
 
 <!-- 설정 -->
 <section class="tab" id="t-set">
+  <div class="card">
+    <h2>인원 일괄 등록</h2>
+    <p class="desc">2024년부터 현재까지 재직·퇴사한 인원을 엑셀로 한 번에 등록합니다. 양식을 내려받아 엑셀에서 채운 뒤, "CSV UTF-8" 형식으로 저장해서 업로드하세요.</p>
+    <details class="help"><summary>자세히</summary><p>열 순서는 <b>법인 · 이름 · 팀 · 직급 · 직무 · 입사일 · 퇴사일 · 연봉</b>입니다(머리글 줄은 그대로 둬도 자동으로 건너뜁니다). 퇴사일을 채우면 그 사람은 바로 퇴사자 명단으로 들어가고, 재직 중이면 퇴사일 칸을 비워두세요. 날짜는 2024-01-15처럼 입력해 주세요(엑셀이 날짜 서식으로 자동 변환하면 못 읽을 수 있습니다).</p></details>
+    <div class="row" style="margin-bottom:10px">
+      <button class="btn" id="bulkTemplate">양식 내려받기 (CSV)</button>
+      <label class="btn">파일 선택<input type="file" id="bulkFile" accept=".csv" hidden></label>
+      <span class="muted" id="bulkMsg"></span>
+    </div>
+    <div class="row">
+      <button class="btn" id="bulkAdd">명단에 추가</button>
+      <button class="btn" id="bulkReplace">명단 전체 교체</button>
+    </div>
+  </div>
   <div class="grid two">
     <div class="card">
       <h2>계산 기준</h2>

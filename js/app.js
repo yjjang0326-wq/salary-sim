@@ -219,7 +219,7 @@ $("#planTbl").addEventListener("click", ev=>{
 });
 ["#pCo","#pDue","#pOnlyInc"].forEach(s=>$(s).addEventListener("change",renderPlan));
 $("#pReset").onclick=()=>{ const prev=S.emps.map(e=>e.rate); S.emps.forEach(e=>e.rate=null); renderAll(); toast("최종 인상률을 권장값으로 되돌렸습니다",()=>{ S.emps.forEach((e,i)=>e.rate=prev[i]); renderAll(); }); };
-$("#pAdd").onclick=()=>{ const co=corps()[0]||"민컴"; const e={id:uid(),manual:true,co,name:"새 직원",dept:"",pos:"매니저",type:"정규직",hire:ymd(TODAY),ann:30000000,meal:200000,inc:true,grade:"B",rate:null,plan:ymd(addM(TODAY,12)),memo:""};
+$("#pAdd").onclick=()=>{ const co=corps()[0]||"민컴"; const e={id:uid(),manual:true,co,name:"새 직원",dept:"",pos:"매니저",job:"",type:"정규직",hire:ymd(TODAY),ann:30000000,meal:200000,inc:true,grade:"B",rate:null,plan:ymd(addM(TODAY,12)),memo:""};
   S.emps.unshift(e); renderAll(); openPerson(e.id,true); };
 
 /* ---------- 시뮬레이터 ---------- */
@@ -670,6 +670,50 @@ function renderSet(){
 $("#setTbl").addEventListener("change",ev=>{ const k=ev.target.dataset.sk; if(!k) return; const v=ev.target.value; S.set[k]= v==="true"?true: v==="false"?false: +v;
   if(k==="cycle"){ /* 주기 변경 시 예정일 재계산 여부 */ const prev=S.emps.map(e=>e.plan); S.emps.forEach(e=>{ const d=defaultPlan(e,S.set.cycle); if(d) e.plan=ymd(d); }); toast("협상 주기에 맞춰 예정일을 다시 계산했습니다",()=>{ S.emps.forEach((e,i)=>e.plan=prev[i]); renderAll(); }); }
   renderAll(); });
+/* ---------- 인원 일괄 등록 (CSV) ---------- */
+function parseBulkCSV(text){
+  const out=[];
+  text.split(/\r?\n/).forEach(line=>{
+    if(!line.trim()) return;
+    let c=line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/); if(c.length<8) c=line.split("\t");
+    c=c.map(x=>x.replace(/^"|"$/g,"").trim());
+    if(c.length<8) return;
+    if(c[0]==="법인" || c[1]==="이름") return; // 머리글 줄
+    const hireD=pd(c[5]); if(!hireD) return;
+    const ann=+String(c[7]).replace(/[^\d.]/g,""); if(!ann) return;
+    const e={id:uid(),manual:true,co:c[0],name:c[1],dept:c[2],pos:c[3],job:c[4]||"",type:"정규직",hire:ymd(hireD),ann:Math.round(ann/1e4)*1e4,meal:S.set.mealExempt,inc:true,grade:"B",rate:null,plan:"",memo:""};
+    const leftD=pd(c[6]);
+    if(leftD) e.left=ymd(leftD); else { const d=defaultPlan(e,S.set.cycle); if(d) e.plan=ymd(d); }
+    out.push(e);
+  });
+  return out;
+}
+let bulkRows=[];
+$("#bulkTemplate").onclick=()=>{
+  const header=["법인","이름","팀","직급","직무","입사일","퇴사일","연봉"];
+  const example=["민컴","홍길동","경영지원팀","매니저","인사총무","2024-01-15","","36000000"];
+  download("인원등록_양식.csv","﻿"+[header.join(","),example.join(",")].join("\r\n"),"text/csv;charset=utf-8");
+};
+$("#bulkFile").onchange=ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const rd=new FileReader();
+  rd.onload=()=>{ bulkRows=parseBulkCSV(rd.result); $("#bulkMsg").textContent = bulkRows.length? `${bulkRows.length}명 확인됨 — 아래 버튼으로 반영하세요` : "읽을 수 있는 행이 없습니다. 열 순서를 확인하세요"; };
+  rd.readAsText(f,"utf-8"); ev.target.value="";
+};
+$("#bulkAdd").onclick=()=>{
+  if(!bulkRows.length){ $("#bulkMsg").textContent="먼저 파일을 선택하세요"; return; }
+  const actives=bulkRows.filter(e=>!e.left), lefts=bulkRows.filter(e=>e.left);
+  S.emps.push(...actives); S.left.push(...lefts);
+  $("#bulkMsg").textContent=`${bulkRows.length}명 추가됨`; const n=bulkRows.length; bulkRows=[]; renderAll();
+  toast(`${n}명을 명단에 추가했습니다`,()=>{ actives.forEach(e=>{ const i=S.emps.indexOf(e); if(i>-1) S.emps.splice(i,1); }); lefts.forEach(e=>{ const i=S.left.indexOf(e); if(i>-1) S.left.splice(i,1); }); renderAll(); });
+};
+$("#bulkReplace").onclick=()=>{
+  if(!bulkRows.length){ $("#bulkMsg").textContent="먼저 파일을 선택하세요"; return; }
+  const prevEmps=S.emps, prevLeft=S.left;
+  S.emps=bulkRows.filter(e=>!e.left); S.left=bulkRows.filter(e=>e.left);
+  $("#bulkMsg").textContent=`${bulkRows.length}명으로 전체 교체됨`; const n=bulkRows.length; bulkRows=[]; renderAll();
+  toast(`명단을 ${n}명으로 전체 교체했습니다`,()=>{ S.emps=prevEmps; S.left=prevLeft; renderAll(); });
+};
 $("#resetAll").onclick=()=>{ const prev=JSON.stringify(S); try{localStorage.removeItem(LSKEY);}catch(e){} S=defaultState(); renderAll(); toast("처음 상태로 되돌렸습니다",()=>{ S=JSON.parse(prev); renderAll(); }); };
 $("#adminAdd").onclick=async()=>{
   const email=$("#adminEmail").value.trim(), pw=$("#adminPw").value;
@@ -702,6 +746,7 @@ function openPerson(id, edit){
       <label>성명 <input type="text" id="peName" class="w90" value="${esc(e.name)}"></label>
       <label>부서 <input type="text" id="peDept" class="w120" value="${esc(e.dept)}"></label>
       <label>직위 <input type="text" id="pePos" class="w90" value="${esc(e.pos)}"></label>
+      <label>직무 <input type="text" id="peJob" class="w120" value="${esc(e.job||"")}"></label>
       <label>입사일 <input type="date" id="peHire" value="${e.hire}"></label>
       <label>퇴사일 <input type="date" id="peLeftD" value=""></label>
       <label>식대 <input type="number" id="peMeal" class="w90" value="${e.meal}"></label>
@@ -718,7 +763,7 @@ function openPerson(id, edit){
     <div id="letterWrap">${letter(e,r)}</div>`;
   $("#modal").classList.add("on");
   $("#peSave").onclick=()=>{
-    e.ann=Math.round((+$("#peAnn").value||0)*1e4)||e.ann; e.type=$("#peType").value; e.exec=$("#peExec").checked; e.fund=$("#peFund").value; e.co=$("#peCo").value; e.name=$("#peName").value.trim()||e.name; e.dept=$("#peDept").value; e.pos=$("#pePos").value; e.hire=$("#peHire").value; e.meal=+$("#peMeal").value||0;
+    e.ann=Math.round((+$("#peAnn").value||0)*1e4)||e.ann; e.type=$("#peType").value; e.exec=$("#peExec").checked; e.fund=$("#peFund").value; e.co=$("#peCo").value; e.name=$("#peName").value.trim()||e.name; e.dept=$("#peDept").value; e.pos=$("#pePos").value; e.job=$("#peJob").value; e.hire=$("#peHire").value; e.meal=+$("#peMeal").value||0;
     if(!HIST().some(h=>h.name===e.name)){ const d=defaultPlan(e,S.set.cycle); if(d) e.plan=ymd(d); } // 인상 이력이 없는 신규 등록만 입사일 기준으로 예정일 자동 계산
     const leftD=$("#peLeftD").value;
     if(leftD){
