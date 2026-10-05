@@ -58,3 +58,4 @@ supabase/functions/create-admin/index.ts   관리자 추가용 Edge Function (Su
 - 삭제 동작은 `toast(메시지, 되돌리기함수)`로 되돌리기 제공
 - 법인 색은 CSS 변수 `--c-<약칭>` (applyCorps가 주입), 표의 법인 줄은 `coRow(co)`, 배지는 `coTag(co)`
 - 이 저장소는 공개해도 됨 — 실명·연봉은 Supabase에만 있고 코드에는 없음. `js/boot.js`의 Supabase anon 키는 공개돼도 안전한 키(RLS가 비로그인 접근을 막음)
+- 직원 등록·수정은 `openPerson()` 상세 폼 하나로 통합(「개인별 협상표」에서 이름 클릭 또는 "직원 추가"). 법인·이름·부서·직위·입사일·**퇴사일**·연봉을 한 화면에서 입력하며, 퇴사일을 채우고 저장하면 `peSave` 핸들러가 바로 `S.left`로 옮김. 인상 이력이 없는 신규 등록자는 저장 시 `defaultPlan()`으로 예정일을 자동 계산(기존 직원은 예정일을 건드리지 않음)
